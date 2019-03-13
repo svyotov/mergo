@@ -165,7 +165,6 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 					return
 				}
 				dst.SetMapIndex(key, dstMapElm)
-				return
 			}
 			if srcElement.IsValid() && (overwrite || (!dstElement.IsValid() || isEmptyValue(dstElement))) {
 				if dst.IsNil() {
