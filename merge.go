@@ -132,10 +132,11 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 		}
 		for _, key := range src.MapKeys() {
 			srcElement := src.MapIndex(key)
-			if !srcElement.IsValid() || !srcElement.CanInterface() {
+			dstElement := dst.MapIndex(key)
+			fmt.Println(key, dstElement, srcElement)
+			if !srcElement.IsValid() {
 				continue
 			}
-			dstElement := dst.MapIndex(key)
 			if dst.MapIndex(key).IsValid() {
 				k := dstElement.Interface()
 				dstElement = reflect.ValueOf(k)
@@ -176,6 +177,11 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 	case reflect.Slice:
 		if !dst.CanSet() {
 			break
+		}
+		// TODO this should be at the top of function
+		if src.Type() != dst.Type() {
+			err = fmt.Errorf("cannot append two slice with different type (%s, %s)", src.Type(), dst.Type())
+			return
 		}
 		if (!isEmptyValue(src) || overwriteWithEmptySrc) && (overwrite || isEmptyValue(dst)) && !config.AppendSlice {
 			dst.Set(src)
