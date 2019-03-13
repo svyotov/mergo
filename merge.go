@@ -17,10 +17,8 @@ import (
 func hasExportedField(dst reflect.Value) (exported bool) {
 	for i, n := 0, dst.NumField(); i < n; i++ {
 		field := dst.Type().Field(i)
-		if field.Anonymous && dst.Field(i).Kind() == reflect.Struct {
-			exported = exported || hasExportedField(dst.Field(i))
-		} else {
-			exported = exported || isFieldExported(field)
+		if isFieldExported(field) {
+			return true
 		}
 	}
 	return
@@ -122,6 +120,7 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 				dst = src
 			}
 		}
+
 	case reflect.Map:
 		if dst.IsNil() && !src.IsNil() {
 			if dst.CanSet() {
@@ -133,7 +132,7 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 		}
 		for _, key := range src.MapKeys() {
 			srcElement := src.MapIndex(key)
-			if !srcElement.IsValid() {
+			if !srcElement.IsValid() || !srcElement.CanInterface() {
 				continue
 			}
 			dstElement := dst.MapIndex(key)
@@ -141,11 +140,9 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 				k := dstElement.Interface()
 				dstElement = reflect.ValueOf(k)
 			}
-
-			switch srcElement.Kind() {
-			case reflect.Chan, reflect.Func, reflect.Map, reflect.Interface, reflect.Slice:
-				if srcElement.IsNil() {
-					continue
+			if isReflectNil(srcElement) {
+				if overwrite || !dstElement.IsValid() {
+					dst.SetMapIndex(key, srcElement)
 				}
 				fallthrough
 			default:
@@ -193,10 +190,6 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 					dst.SetMapIndex(key, dstSlice)
 				}
 			}
-			if dstElement.IsValid() && !isEmptyValue(dstElement) && (reflect.TypeOf(srcElement.Interface()).Kind() == reflect.Map || reflect.TypeOf(srcElement.Interface()).Kind() == reflect.Slice) || (reflect.TypeOf(srcElement.Interface()).Kind() == reflect.Struct) {
-				continue
-			}
-
 			if srcElement.IsValid() && (overwrite || (!dstElement.IsValid() || isEmptyValue(dstElement))) {
 				if dst.IsNil() {
 					dst.Set(reflect.MakeMap(dst.Type()))
