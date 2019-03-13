@@ -62,6 +62,7 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 	if !src.IsValid() {
 		return
 	}
+
 	if dst.CanAddr() {
 		addr := dst.UnsafeAddr()
 		h := 17 * addr
@@ -120,6 +121,7 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 			} else {
 				dst = dstCp
 			}
+			return
 		} else {
 			if (isReflectNil(dst) || overwrite) && (!isEmptyValue(src) || overwriteWithEmptySrc) {
 				dst = src
@@ -138,7 +140,6 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 		for _, key := range src.MapKeys() {
 			srcElement := src.MapIndex(key)
 			dstElement := dst.MapIndex(key)
-			fmt.Println(key, dstElement, srcElement)
 			if !srcElement.IsValid() {
 				continue
 			}
@@ -155,41 +156,35 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 			if !srcElement.CanInterface() {
 				continue
 			}
-			switch reflect.TypeOf(srcElement.Interface()).Kind() {
-			case reflect.Struct, reflect.Map, reflect.Ptr, reflect.Slice:
-				srcMapElm := srcElement
-				dstMapElm := dstElement
-				if srcMapElm.CanInterface() {
-					srcMapElm = reflect.ValueOf(srcMapElm.Interface())
-					if dstMapElm.IsValid() {
-						dstMapElm = reflect.ValueOf(dstMapElm.Interface())
-					}
+
+			if srcElement.CanInterface() {
+				srcElement = reflect.ValueOf(srcElement.Interface())
+				if dstElement.IsValid() {
+					dstElement = reflect.ValueOf(dstElement.Interface())
 				}
-				dstMapElm, err = deepMerge(dstMapElm, srcMapElm, visited, depth+1, config)
-				if err != nil {
-					return
-				}
-				dst.SetMapIndex(key, dstMapElm)
 			}
-			if srcElement.IsValid() && (overwrite || (!dstElement.IsValid() || isEmptyValue(dstElement))) {
-				if dst.IsNil() {
-					dst.Set(reflect.MakeMap(dst.Type()))
-				}
-				dst.SetMapIndex(key, srcElement)
+			dstElement, err = deepMerge(dstElement, srcElement, visited, depth+1, config)
+			if err != nil {
+				return
 			}
+			dst.SetMapIndex(key, dstElement)
+
 		}
 	case reflect.Slice:
-		if !dst.CanSet() {
-			break
-		}
+		newSlice := dst
 		if (!isEmptyValue(src) || overwriteWithEmptySrc) && (overwrite || isEmptyValue(dst)) && !config.AppendSlice {
-			dst.Set(src)
+			newSlice = src
 		} else if config.AppendSlice {
 			if src.Type() != dst.Type() {
 				err = fmt.Errorf("cannot append two slice with different type (%s, %s)", src.Type(), dst.Type())
 				return
 			}
-			dst.Set(reflect.AppendSlice(dst, src))
+			newSlice = reflect.AppendSlice(dst, src)
+		}
+		if dst.CanSet() {
+			dst.Set(newSlice)
+		} else {
+			dst = newSlice
 		}
 	case reflect.Ptr, reflect.Interface:
 		if isReflectNil(src) {
