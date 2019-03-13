@@ -144,51 +144,27 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 				if overwrite || !dstElement.IsValid() {
 					dst.SetMapIndex(key, srcElement)
 				}
-				fallthrough
-			default:
-				if !srcElement.CanInterface() {
-					continue
+				continue
+			}
+			if !srcElement.CanInterface() {
+				continue
+			}
+			switch reflect.TypeOf(srcElement.Interface()).Kind() {
+			case reflect.Struct, reflect.Map, reflect.Ptr, reflect.Slice:
+				srcMapElm := srcElement
+				dstMapElm := dstElement
+				if srcMapElm.CanInterface() {
+					srcMapElm = reflect.ValueOf(srcMapElm.Interface())
+					if dstMapElm.IsValid() {
+						dstMapElm = reflect.ValueOf(dstMapElm.Interface())
+					}
 				}
-				switch reflect.TypeOf(srcElement.Interface()).Kind() {
-				case reflect.Struct:
-					fallthrough
-				case reflect.Ptr:
-					fallthrough
-				case reflect.Map:
-					srcMapElm := srcElement
-					dstMapElm := dstElement
-					if srcMapElm.CanInterface() {
-						srcMapElm = reflect.ValueOf(srcMapElm.Interface())
-						if dstMapElm.IsValid() {
-							dstMapElm = reflect.ValueOf(dstMapElm.Interface())
-						}
-					}
-					dstMapElm, err = deepMerge(dstMapElm, srcMapElm, visited, depth+1, config)
-					if err != nil {
-						return
-					}
-					dst.SetMapIndex(key, dstMapElm)
-				case reflect.Slice:
-					srcSlice := reflect.ValueOf(srcElement.Interface())
-
-					var dstSlice reflect.Value
-					if !dstElement.IsValid() || isReflectNil(dstElement) {
-						dstSlice = reflect.MakeSlice(srcSlice.Type(), 0, srcSlice.Len())
-					} else {
-						dstSlice = reflect.ValueOf(dstElement.Interface())
-					}
-
-					if (!isEmptyValue(src) || overwriteWithEmptySrc) && (overwrite || isEmptyValue(dst)) && !config.AppendSlice {
-						dstSlice = srcSlice
-					} else if config.AppendSlice {
-						if srcSlice.Type() != dstSlice.Type() {
-							err = fmt.Errorf("cannot append two slice with different type (%s, %s)", srcSlice.Type(), dstSlice.Type())
-							return
-						}
-						dstSlice = reflect.AppendSlice(dstSlice, srcSlice)
-					}
-					dst.SetMapIndex(key, dstSlice)
+				dstMapElm, err = deepMerge(dstMapElm, srcMapElm, visited, depth+1, config)
+				if err != nil {
+					return
 				}
+				dst.SetMapIndex(key, dstMapElm)
+				return
 			}
 			if srcElement.IsValid() && (overwrite || (!dstElement.IsValid() || isEmptyValue(dstElement))) {
 				if dst.IsNil() {
