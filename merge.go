@@ -83,6 +83,11 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 		}
 	}
 
+	if dst.IsValid() && src.IsValid() && src.Type() != dst.Type() {
+		err = fmt.Errorf("cannot append two different types (%s, %s)", src.Kind(), dst.Kind())
+		return
+	}
+
 	switch dst.Kind() {
 	case reflect.Struct:
 		if hasExportedField(dst) {
@@ -142,7 +147,7 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 				dstElement = reflect.ValueOf(k)
 			}
 			if isReflectNil(srcElement) {
-				if overwrite || !dstElement.IsValid() {
+				if overwrite || isReflectNil(dstElement) {
 					dst.SetMapIndex(key, srcElement)
 				}
 				continue
@@ -176,11 +181,6 @@ func deepMerge(dstIn, src reflect.Value, visited map[uintptr]*visit, depth int, 
 	case reflect.Slice:
 		if !dst.CanSet() {
 			break
-		}
-		// TODO this should be at the top of function
-		if src.Type() != dst.Type() {
-			err = fmt.Errorf("cannot append two slice with different type (%s, %s)", src.Type(), dst.Type())
-			return
 		}
 		if (!isEmptyValue(src) || overwriteWithEmptySrc) && (overwrite || isEmptyValue(dst)) && !config.AppendSlice {
 			dst.Set(src)
