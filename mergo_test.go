@@ -344,13 +344,13 @@ func TestEmptyToNotEmptyMaps(t *testing.T) {
 }
 
 func TestMapsWithOverwrite(t *testing.T) {
-	m := map[string]simpleTest{
+	dst := map[string]simpleTest{
 		"a": {},   // overwritten by 16
 		"b": {42}, // not overwritten by empty value
 		"c": {13}, // overwritten by 12
 		"d": {61},
 	}
-	n := map[string]simpleTest{
+	src := map[string]simpleTest{
 		"a": {16},
 		"b": {},
 		"c": {12},
@@ -364,12 +364,12 @@ func TestMapsWithOverwrite(t *testing.T) {
 		"e": {14},
 	}
 
-	if err := MergeWithOverwrite(&m, n); err != nil {
+	if err := MergeWithOverwrite(&dst, src); err != nil {
 		t.Fatalf(err.Error())
 	}
 
-	if !reflect.DeepEqual(m, expect) {
-		t.Fatalf("Test failed:\ngot  :\n%#v\n\nwant :\n%#v\n\n", m, expect)
+	if !reflect.DeepEqual(dst, expect) {
+		t.Fatalf("Test failed:\ngot  :\n%#v\n\nwant :\n%#v\n\n", dst, expect)
 	}
 }
 
@@ -724,14 +724,14 @@ func TestBooleanPointer(t *testing.T) {
 }
 
 func TestMergeMapWithInnerSliceOfDifferentType(t *testing.T) {
-	src := map[string]interface{}{
+	dst := map[string]interface{}{
 		"foo": []string{"a", "b"},
 	}
-	dst := map[string]interface{}{
+	src := map[string]interface{}{
 		"foo": []int{1, 2},
 	}
 
-	if err := Merge(&src, &dst, WithOverride, WithAppendSlice); err == nil {
+	if err := Merge(&dst, src, WithOverride, WithAppendSlice); err == nil {
 		t.Fatal("expected an error, got nothing")
 	}
 }
